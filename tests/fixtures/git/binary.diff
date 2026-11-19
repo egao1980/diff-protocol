@@ -1,0 +1,10 @@
+diff --git a/logo.bin b/logo.bin
+index 6735744..7495ad3 100644
+Binary files a/logo.bin and b/logo.bin differ
+diff --git a/t.txt b/t.txt
+index 587be6b..975fbec 100644
+--- a/t.txt
++++ b/t.txt
+@@ -1 +1 @@
+-x
++y
