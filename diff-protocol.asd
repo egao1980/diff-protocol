@@ -1,5 +1,5 @@
 (defsystem "diff-protocol"
-  :version "0.2.0"
+  :version "0.2.1"
   :description "CLOS diff protocol for cl-stack: diffs as values (change trees), engines per content type, apply / invert / compose / rebase / three-way"
   :author "egao1980"
   :license "MIT"
@@ -40,7 +40,8 @@
                (:file "tree-test")
                (:file "tree-engine-test")
                (:file "tree-laws-test")
-               (:file "git-unified-test"))
+               (:file "git-unified-test")
+               (:file "git-quoted-test"))
   :perform (test-op (o c)
              (unless (symbol-call :rove :run c)
                (error "tests failed for ~A" (component-name c)))))
