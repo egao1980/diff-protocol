@@ -1,0 +1,4 @@
+diff --git "a/src\tfile.txt" "b/copy\tfile.txt"
+similarity index 100%
+copy from "src\tfile.txt"
+copy to "copy\tfile.txt"

@@ -1,0 +1,53 @@
+diff --git "a/back\\slash.txt" "b/back\\slash.txt"
+deleted file mode 100644
+index 286c5f5..0000000
+--- "a/back\\slash.txt"
++++ /dev/null
+@@ -1 +0,0 @@
+-gone
+diff --git "a/bin\tfile.bin" "b/bin\tfile.bin"
+new file mode 100644
+index 0000000..8352675
+Binary files /dev/null and "b/bin\tfile.bin" differ
+diff --git a/café.txt b/café.txt
+index 587be6b..975fbec 100644
+--- a/café.txt
++++ b/café.txt
+@@ -1 +1 @@
+-x
++y
+diff --git "a/mode\tx.sh" "b/mode\tx.sh"
+old mode 100644
+new mode 100755
+diff --git a/plain.txt "b/new\"name.txt"
+similarity index 100%
+rename from plain.txt
+rename to "new\"name.txt"
+diff --git "a/nl\nname.txt" "b/nl\nname.txt"
+new file mode 100644
+index 0000000..3e75765
+--- /dev/null
++++ "b/nl\nname.txt"
+@@ -0,0 +1 @@
++new
+diff --git "a/quote\"d.txt" "b/renamed\ttoo.txt"
+similarity index 61%
+rename from "quote\"d.txt"
+rename to "renamed\ttoo.txt"
+index 8a1218a..f470afb 100644
+--- "a/quote\"d.txt"
++++ "b/renamed\ttoo.txt"
+@@ -2,4 +2,4 @@
+ 2
+ 3
+ 4
+-5
++FIVE
+diff --git "a/tab\there.txt" "b/tab\there.txt"
+index 814f4a4..879de50 100644
+--- "a/tab\there.txt"
++++ "b/tab\there.txt"
+@@ -1,2 +1,2 @@
+ one
+-two
++TWO
