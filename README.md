@@ -4,7 +4,7 @@ Diffs as values for [cl-stack](https://github.com/egao1980/cl-stack) (`stack-dif
 
 Brief: [`cl-stack/docs/capabilities/diff.md`](https://github.com/egao1980/cl-stack/blob/main/docs/capabilities/diff.md). Plan: Track R, milestone R0.
 
-**Status: R0 contract.** The package, condition tree and generic functions are declared; methods are not implemented yet, so `diff-protocol/tests` fails. The tests are the spec.
+Version **0.1.0** — milestone R0: diff values (lazy content, footprints, levels), the sexp/plist engine, apply / invert / compose / rebase / three-way merge with restarts, and `render-diff` / `parse-diff` for `:summary` and `:sexp`. Text, tree, lisp-form, JSON and schema engines are later milestones.
 
 ```lisp
 (let* ((e (stack-diff:find-diff-engine :sexp))
