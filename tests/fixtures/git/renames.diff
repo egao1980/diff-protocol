@@ -1,0 +1,23 @@
+diff --git a/a.txt b/b.txt
+similarity index 100%
+rename from a.txt
+rename to b.txt
+diff --git a/lib/c.lisp b/lib2/c.lisp
+similarity index 87%
+rename from lib/c.lisp
+rename to lib2/c.lisp
+index 1909d63..05cfbaf 100644
+--- a/lib/c.lisp
++++ b/lib2/c.lisp
+@@ -2,7 +2,7 @@
+ (form 2)
+ (form 3)
+ (form 4)
+-(form 5)
++(form FIVE)
+ (form 6)
+ (form 7)
+ (form 8)
+diff --git a/run.sh b/run.sh
+old mode 100644
+new mode 100755

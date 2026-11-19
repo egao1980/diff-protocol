@@ -36,7 +36,15 @@ REASON is :MISSING, :EXISTS or :BEFORE-MISMATCH; ACTUAL is the value found at th
                      (unsupported-content-engine c) (unsupported-content-content c))))
   (:documentation "An engine cannot diff or apply this content (wrong type, opaque change)."))
 
-(defun skip-change (&optional condition)
+(define-condition diff-parse-error (diff-error)
+  ((line :initarg :line :initform nil :reader diff-parse-error-line)
+   (text :initarg :text :initform nil :reader %diff-parse-error-text))
+  (:report (lambda (c s)
+             (format s "Cannot parse diff~@[ at line ~D~]~@[: ~S~]"
+                     (diff-parse-error-line c) (%diff-parse-error-text c))))
+  (:documentation "PARSE-DIFF met malformed input. LINE is the 1-based input line number."))
+
+(defun skip-change(&optional condition)
   "Invoke the SKIP-CHANGE restart (of CONDITION, if given). Like CL:CONTINUE: returns NIL when there is none."
   (let ((restart (find-restart 'skip-change condition)))
     (when restart

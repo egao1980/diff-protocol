@@ -26,4 +26,14 @@
    #:sexp-diff-engine #:engine-name #:find-diff-engine
    ;; protocol
    #:compute-diff #:state-equal #:apply-diff #:invert-diff #:compose-diffs
-   #:rebase-diff #:three-way-diff #:render-diff #:parse-diff))
+   #:rebase-diff #:three-way-diff #:render-diff #:parse-diff
+   ;; R1: parse errors
+   #:diff-parse-error #:diff-parse-error-line
+   ;; R1: text engine
+   #:text-diff-engine #:text-engine-algorithm #:split-lines #:merge-texts
+   ;; R1: tree values (plain data). TREE-MODE is the path step that addresses a file's mode.
+   #:make-tree #:make-tree-file #:tree-dir-p #:tree-file-p #:tree-entries
+   #:tree-file-type #:tree-file-content #:tree-file-mode #:tree-get #:tree-mode
+   ;; R1: tree engine
+   #:tree-diff-engine #:tree-engine-rename-threshold #:tree-engine-detect-renames
+   #:tree-engine-leaf-engines))
