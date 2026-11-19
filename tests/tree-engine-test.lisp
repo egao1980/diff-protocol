@@ -81,7 +81,7 @@
                  (:modify ("t" 0) nil ("tree:/t" "text:/t/0-1")))
                (tree-shapes diff))
         "sexp leaves via the sexp engine, binary as a whole, text as hunks")
-    (ok (equal (octets 1 2 4) (d:tree-file-content (d:change-after (third (d:diff-changes diff))))))))
+    (ok (equalp (octets 1 2 4) (d:tree-file-content (d:change-after (third (d:diff-changes diff))))))))
 
 (deftest tree-type-change-is-whole
   (ok (equal '((:modify ("c") nil ("tree:/c")))
