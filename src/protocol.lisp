@@ -5,6 +5,10 @@
 ;;; engine-independent operations in ops.lisp, render / parse in render.lisp.
 ;;; Brief: cl-stack/docs/capabilities/diff.md.
 
+(defmacro %define-alias (old new)
+  "Make OLD name the same function as NEW (a 0.2 internal name kept working)."
+  `(setf (fdefinition ',old) (fdefinition ',new)))
+
 (defstruct (%lazy (:constructor %lazy (value fn loaded-p)) (:copier nil))
   "One side (before / after) of a change: a value, or a thunk forced once and cached.
 Shared between a change and its inverse; the only mutation in the protocol is %FORCE."
@@ -146,6 +150,19 @@ ending at a \"/\" boundary (the prefix ends in \"/\" or the next char is \"/\").
   "→ the engine instance registered under keyword NAME (:SEXP at R0), or NIL."
   (cdr (assoc name *diff-engines*)))
 
+(defun register-diff-engine (name engine)
+  "Register ENGINE (a DIFF-ENGINE) under keyword NAME so FIND-DIFF-ENGINE and
+PARSE-DIFF :SEXP find it → the registered instance. A name is registered once: when
+NAME is taken, the existing shared instance is kept and returned (a reload keeps it).
+NAME should be ENGINE's ENGINE-NAME."
+  (check-type name keyword)
+  (check-type engine diff-engine)
+  (unless (find-diff-engine name)
+    (setf *diff-engines* (append *diff-engines* (list (cons name engine)))))
+  (find-diff-engine name))
+
+(%define-alias %register-engine register-diff-engine)
+
 (defgeneric engine-name (engine)
   (:documentation "Keyword naming the engine (:SEXP)."))
 
@@ -180,16 +197,51 @@ restarts SKIP-CHANGE, USE-VALUE, ABORT (→ (values state :aborted))."))
 (defgeneric parse-diff (format input)
   (:documentation "FORMAT :SEXP; INPUT a string or stream → DIFF."))
 
-(defgeneric %apply-change (engine state change diff)
-  (:documentation "→ new state after one leaf CHANGE of DIFF. Signals APPLY-CONFLICT or
-UNSUPPORTED-CONTENT; never mutates STATE."))
+;;; Engine extension API (diff-protocol#6). An engine in any repo subclasses
+;;; DIFF-ENGINE, registers one shared instance with REGISTER-DIFF-ENGINE and
+;;; specializes the GFs below; APPLY-DIFF (restarts), INVERT-DIFF, COMPOSE-DIFFS,
+;;; THREE-WAY-DIFF, REBASE-DIFF, the tree engine's nesting and the renders then
+;;; work unchanged. The 0.2 internal names (%APPLY-CHANGE, %PUT-VALUE,
+;;; %INVERT-CHANGE, %THREE-WAY, %REBASE, %REGISTER-ENGINE) name the same
+;;; functions, so methods defined on either name are one method set.
 
-(defgeneric %invert-change (change diff)
-  (:documentation "→ the inverse of CHANGE. Signals IRREVERSIBLE-CHANGE when it has none."))
+(defgeneric apply-change (engine state change diff)
+  (:documentation "Engine hook of APPLY-DIFF: → new state after one leaf CHANGE of DIFF.
+Signals APPLY-CONFLICT (:REASON :MISSING / :EXISTS / :BEFORE-MISMATCH) or
+UNSUPPORTED-CONTENT; APPLY-DIFF wraps each call in its SKIP-CHANGE / USE-VALUE / ABORT
+restarts. Never mutates STATE."))
 
-(defgeneric %put-value (engine state change value diff)
-  (:documentation "→ new state with VALUE at CHANGE's path (the USE-VALUE restart of APPLY-DIFF).
-Signals APPLY-CONFLICT (:MISSING) when the path cannot be reached."))
+(%define-alias %apply-change apply-change)
+
+(defgeneric invert-change (change diff)
+  (:documentation "Hook of INVERT-DIFF: → the inverse of CHANGE (of DIFF). The CHANGE
+method swaps kind (:ADD ↔ :REMOVE), path / from of a :MOVE and the lazy sides, and
+keeps footprints (\"text:…/s-e\" ranges are recomputed); an engine with its own
+change subclass specializes on it. Signals IRREVERSIBLE-CHANGE when there is none."))
+
+(%define-alias %invert-change invert-change)
+
+(defgeneric put-value (engine state change value diff)
+  (:documentation "Engine hook of APPLY-DIFF's USE-VALUE restart: → new state with VALUE
+at CHANGE's path. Signals APPLY-CONFLICT (:MISSING) when the path cannot be reached."))
+
+(%define-alias %put-value put-value)
+
+(defgeneric render-unified-content (engine before after changes stream)
+  (:documentation "Engine hook of RENDER-DIFF :UNIFIED (diff-protocol#7): write the
+@@ hunks (no ---/+++ header) of one content BEFORE → AFTER to STREAM and return true,
+or return NIL when the engine has no unified form (the tree renders the file as
+`Binary files … differ`; a diff of the engine itself signals UNSUPPORTED-CONTENT).
+BEFORE / AFTER are the contents when the diff carries them, else NIL (an :ADD has no
+BEFORE, a :REMOVE no AFTER, a :CHANGES-level tree diff carries neither). CHANGES are
+the engine's own changes for that content (paths relative to it), NIL for a whole-content
+section. The DIFF-ENGINE method returns NIL; the text engine's renders line hunks
+(its CHANGES when given, else a line diff of BEFORE / AFTER, NIL read as \"\") — an
+engine whose content is text can delegate to (find-diff-engine :text)."))
+
+(defmethod render-unified-content ((e diff-engine) before after changes stream)
+  (declare (ignore before after changes stream))
+  nil)
 
 (defun %force (box)
   "Value of BOX; forces and caches its thunk. An absent side reads NIL and stays not loaded."

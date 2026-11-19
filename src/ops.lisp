@@ -19,7 +19,7 @@
             ;; APPLY-CONFLICT is signalled with SKIP-CHANGE / USE-VALUE / ABORT again
             ;; (diff-protocol#2). The restarts cover any condition the engine signals
             ;; for this change (APPLY-CONFLICT, UNSUPPORTED-CONTENT).
-            (let ((attempt (lambda () (%apply-change e current c d))))
+            (let ((attempt (lambda () (apply-change e current c d))))
               (loop
                 (restart-case (progn (setf current (funcall attempt))
                                      (return))
@@ -33,7 +33,7 @@
                                    (format *query-io* "Value: ")
                                    (force-output *query-io*)
                                    (list (read *query-io*)))
-                    (setf attempt (lambda () (%put-value e current c value d)))))))))
+                    (setf attempt (lambda () (put-value e current c value d)))))))))
       (abort ()
         :report "Abort APPLY-DIFF and return the original state."
         (values state :aborted)))))
@@ -61,7 +61,7 @@ other string is kept."
                 (+ start (length (%lazy-value before-box))))
         f)))
 
-(defmethod %invert-change ((c change) d)
+(defmethod invert-change ((c change) d)
   (let ((kind (change-kind c)))
     (make-instance 'change
                    :kind (case kind (:add :remove) (:remove :add) (t kind))
@@ -76,14 +76,14 @@ other string is kept."
                    :after-box (%before-box c)
                    :children (%invert-changes (change-children c) d))))
 
-(defmethod %invert-change ((c opaque-change) d)
+(defmethod invert-change ((c opaque-change) d)
   (error 'irreversible-change :change c :diff d))
 
 (defun %invert-changes (changes d)
   "Inverses of CHANGES in reverse order, with SKIP-CHANGE / USE-VALUE per change."
   (let ((out '()))
     (dolist (c changes out)
-      (restart-case (push (%invert-change c d) out)
+      (restart-case (push (invert-change c d) out)
         (skip-change ()
           :report "Omit this change from the inverse."
           nil)
@@ -246,14 +246,24 @@ either removes or adds on one list, so the removes counted are the other side's.
                (cell (assoc parent out :test #'equal)))
           (if cell (incf (cdr cell)) (push (cons parent 1) out)))))))
 
-;;; Internal merge hooks
+;;; Merge hooks (engine extension API)
 
-(defgeneric %three-way (engine base ours theirs resolve)
-  (:documentation "→ (values merged-diff conflicts) against BASE. RESOLVE :BASE keeps base
-where the sides conflict (THREE-WAY-DIFF); :THEIRS takes THEIRS there (REBASE-DIFF)."))
+(defgeneric merge-states (engine base ours theirs resolve)
+  (:documentation "Engine hook of THREE-WAY-DIFF (and REBASE-BY-MERGE; the tree engine
+calls it per file on its leaf engines): → (values merged-diff conflicts), MERGED-DIFF
+against BASE, CONFLICTS a list of DIFF-CONFLICT. RESOLVE :BASE keeps BASE where the
+sides conflict (THREE-WAY-DIFF); :THEIRS takes THEIRS there (REBASE-DIFF). The
+DIFF-ENGINE method pairs the leaves of both sides' COMPUTE-DIFF: identical changes
+once, overlapping footprints conflict."))
 
-(defgeneric %rebase (engine d onto base)
-  (:documentation "→ (values diff-after-onto conflicts) for REBASE-DIFF."))
+(%define-alias %three-way merge-states)
+
+(defgeneric rebase-states (engine diff onto base)
+  (:documentation "Engine hook of REBASE-DIFF (DIFF and ONTO both against BASE) →
+(values diff-after-onto conflicts). The DIFF-ENGINE method rebases leaves with absolute
+paths (sexp); an engine whose paths shift (lines, forms) can use REBASE-BY-MERGE."))
+
+(%define-alias %rebase rebase-states)
 
 (defun %merge-leaves (e os ts resolve)
   "Leaf merge (sexp and the default): twins once, conflicts out (or THEIRS's with RESOLVE
@@ -270,7 +280,7 @@ where the sides conflict (THREE-WAY-DIFF); :THEIRS takes THEIRS there (REBASE-DI
                                 ts)))
             conflicts)))
 
-(defmethod %three-way ((e diff-engine) base ours theirs resolve)
+(defmethod merge-states ((e diff-engine) base ours theirs resolve)
   (multiple-value-bind (merged conflicts)
       (%merge-leaves e
                      (diff-changes (compute-diff e base ours :level :changes))
@@ -279,9 +289,9 @@ where the sides conflict (THREE-WAY-DIFF); :THEIRS takes THEIRS there (REBASE-DI
     (values (make-diff merged :engine e :level :changes) conflicts)))
 
 (defmethod three-way-diff ((e diff-engine) base ours theirs)
-  (%three-way e base ours theirs :base))
+  (merge-states e base ours theirs :base))
 
-(defmethod %rebase ((e diff-engine) d onto base)
+(defmethod rebase-states ((e diff-engine) d onto base)
   (declare (ignore base))           ; leaves carry absolute paths
   (let ((ds (%leaves (diff-changes d)))
         (os (%leaves (diff-changes onto))))
@@ -292,14 +302,16 @@ where the sides conflict (THREE-WAY-DIFF); :THEIRS takes THEIRS there (REBASE-DI
                          :engine e :level :changes)
               conflicts))))
 
-(defun %rebase-by-merge (e d onto base)
-  "Text / tree rebase: three-way in state space, conflicts resolved to ONTO; the result is
-the diff from ONTO's state to the merged state."
+(defun rebase-by-merge (e d onto base)
+  "REBASE-STATES by merging in state space (text, tree): MERGE-STATES of BASE, DIFF's and
+ONTO's results with conflicts resolved to ONTO → (values diff-from-onto's-state conflicts)."
   (let ((ours (apply-diff base d))
         (theirs (apply-diff base onto)))
-    (multiple-value-bind (resolved conflicts) (%three-way e base ours theirs :theirs)
+    (multiple-value-bind (resolved conflicts) (merge-states e base ours theirs :theirs)
       (values (compute-diff e theirs (apply-diff base resolved))
               conflicts))))
 
+(%define-alias %rebase-by-merge rebase-by-merge)
+
 (defmethod rebase-diff ((d diff) (onto diff) base)
-  (%rebase (%default-engine d onto) d onto base))
+  (rebase-states (%default-engine d onto) d onto base))

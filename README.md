@@ -4,7 +4,7 @@ Diffs as values for [cl-stack](https://github.com/egao1980/cl-stack) (`stack-dif
 
 Brief: [`cl-stack/docs/capabilities/diff.md`](https://github.com/egao1980/cl-stack/blob/main/docs/capabilities/diff.md). Plan: Track R, milestone R0.
 
-Version **0.2.1** — milestones R0 and R1; 0.2.1 adds C-quoted paths (`"a\tb"`, `\ooo` octets) and `copy from` / `copy to` sections to `:unified` (#4). R0: diff values (lazy content, footprints, levels), the sexp/plist engine, apply / invert / compose / rebase / three-way merge with restarts, `render-diff` / `parse-diff` for `:summary` and `:sexp`. R1: the `:text` engine (Myers, or git-style histogram; hunks with `text:/s-e` footprints; diff3 merge and `merge-texts` conflict markers), plain-data trees and the `:tree` engine (rename detection, per-leaf engine dispatch, mode changes), `:unified` render and a parser for `git diff` / `diff -u` output, and list-index rebasing in sexp merges (#2). Lisp-form, JSON and schema engines are later milestones.
+Version **0.3.0** — milestones R0 and R1; 0.3.0 exports the engine extension API (below, #6) and renders non-text tree files through their engine's unified form (#7); 0.2.1 adds C-quoted paths (`"a\tb"`, `\ooo` octets) and `copy from` / `copy to` sections to `:unified` (#4). R0: diff values (lazy content, footprints, levels), the sexp/plist engine, apply / invert / compose / rebase / three-way merge with restarts, `render-diff` / `parse-diff` for `:summary` and `:sexp`. R1: the `:text` engine (Myers, or git-style histogram; hunks with `text:/s-e` footprints; diff3 merge and `merge-texts` conflict markers), plain-data trees and the `:tree` engine (rename detection, per-leaf engine dispatch, mode changes), `:unified` render and a parser for `git diff` / `diff -u` output, and list-index rebasing in sexp merges (#2). Lisp-form, JSON and schema engines are later milestones.
 
 ```lisp
 (let* ((e (stack-diff:find-diff-engine :sexp))
@@ -23,6 +23,23 @@ Version **0.2.1** — milestones R0 and R1; 0.2.1 adds C-quoted paths (`"a\tb"`,
 | Conditions | `diff-error` → `irreversible-change`, `apply-conflict` (`skip-change` / `use-value` / `abort`), `unsupported-content` |
 
 No dependencies. Tests: Rove (`cl-repo test`); laws are `deftest-parametrize` cases over a fixed corpus.
+
+## Engine extension API (0.3)
+
+An engine in another repo (first one: [diff-backend-lisp-source](https://github.com/egao1980/diff-backend-lisp-source), `:lisp`) subclasses `diff-engine`, registers one shared instance and specializes exported generic functions only. `apply-diff` (with its restarts), `invert-diff`, `compose-diffs`, `three-way-diff`, `rebase-diff`, `parse-diff :sexp`, the tree engine's per-file nesting and `render-diff` then work unchanged.
+
+| Hook | Called by | Default |
+|------|-----------|---------|
+| `(register-diff-engine name engine)` → instance | — (`find-diff-engine`, `parse-diff :sexp`, tree `:leaf-engines` names) | first registration of a name wins |
+| `engine-name`, `compute-diff` (`&key level context`, accept `&allow-other-keys`), `state-equal` | everything | none |
+| `(apply-change engine state change diff)` | `apply-diff`, tree leaves | none |
+| `(put-value engine state change value diff)` | `apply-diff`'s `use-value` restart | none |
+| `(invert-change change diff)` | `invert-diff` | swap kind / sides / move paths |
+| `(merge-states engine base ours theirs resolve)` | `three-way-diff`, tree per-file merge, `rebase-by-merge` | leaf pairing by footprint |
+| `(rebase-states engine diff onto base)` | `rebase-diff` | absolute-path leaves; `rebase-by-merge` for shifting paths |
+| `(render-unified-content engine before after changes stream)` | `render-diff :unified` (the engine's diffs, tree files of its type) | `nil` → `Binary files … differ` / `unsupported-content` |
+
+Footprints are `"<engine-name>:/…"` strings; the tree splices the file path in after the scheme and finds a leaf change's engine by that scheme. The 0.2 internal names `%apply-change`, `%put-value`, `%invert-change`, `%three-way`, `%rebase`, `%rebase-by-merge` and `%register-engine` name the same functions (methods on either name are one method set).
 
 ## License
 

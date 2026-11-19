@@ -20,7 +20,7 @@ text file pair up as a :MOVE. DETECT-RENAMES NIL turns rename detection off."))
 (defmethod engine-name ((e tree-diff-engine))
   :tree)
 
-(%register-engine :tree (make-instance 'tree-diff-engine))
+(register-diff-engine :tree (make-instance 'tree-diff-engine))
 
 ;;; Paths and footprints
 
@@ -240,13 +240,13 @@ the types differ or the type has no leaf engine (the whole node changes)."
 
 ;;; Apply
 
-(defmethod %apply-change ((e tree-diff-engine) state (c opaque-change) d)
+(defmethod apply-change ((e tree-diff-engine) state (c opaque-change) d)
   (declare (ignore state))
   ;; Recoverable through APPLY-DIFF's per-change restarts: USE-VALUE (a file node, put
   ;; at the change's path by %PUT-VALUE) and SKIP-CHANGE.
   (error 'unsupported-content :engine e :content c :change c :diff d))
 
-(defmethod %apply-change ((e tree-diff-engine) state (c change) d)
+(defmethod apply-change ((e tree-diff-engine) state (c change) d)
   (unless (tree-dir-p state)
     (error 'unsupported-content :engine e :content state :change c :diff d))
   (let* ((path (change-path c))
@@ -301,13 +301,13 @@ the types differ or the type has no leaf engine (the whole node changes)."
            (unless leaf
              (error 'unsupported-content :engine e :content node :change c :diff d))
            (let ((content (handler-case
-                              (%apply-change leaf (tree-file-content node)
+                              (apply-change leaf (tree-file-content node)
                                              (%unnest c (length names)) d)
                             (apply-conflict (x)
                               (fail (apply-conflict-reason x) (apply-conflict-actual x))))))
              (put state names (%file-with node :content content)))))))))
 
-(defmethod %put-value ((e tree-diff-engine) state (c change) value d)
+(defmethod put-value ((e tree-diff-engine) state (c change) value d)
   (let* ((path (change-path c))
          (names (%tree-names path))
          (steps (nthcdr (length names) path)))
@@ -326,7 +326,7 @@ the types differ or the type has no leaf engine (the whole node changes)."
                            (let ((leaf (%leaf-engine e (tree-file-type node))))
                              (unless leaf (fail))
                              (%file-with node :content
-                                         (%put-value leaf (tree-file-content node)
+                                         (put-value leaf (tree-file-content node)
                                                      (%unnest c (length names)) value d))))
                        (lambda (f) (declare (ignore f)) (fail))))))))
 
@@ -361,7 +361,7 @@ content merge independently; the content through the leaf engine's three-way."
            (let* ((before (change-before o))
                   (leaf (%leaf-engine e (tree-file-type before))))
              (multiple-value-bind (merged cs)
-                 (%three-way leaf (tree-file-content before)
+                 (merge-states leaf (tree-file-content before)
                              (tree-file-content (change-after o))
                              (tree-file-content (change-after x))
                              resolve)
@@ -373,7 +373,7 @@ content merge independently; the content through the leaf engine's three-way."
           (leaves-x (setf leaves leaves-x)))
     (values (append mode leaves) (nreverse conflicts))))
 
-(defmethod %three-way ((e tree-diff-engine) base ours theirs resolve)
+(defmethod merge-states ((e tree-diff-engine) base ours theirs resolve)
   (let ((os (diff-changes (compute-diff e base ours :level :content)))
         (ts (diff-changes (compute-diff e base theirs :level :content)))
         (merges (make-hash-table :test #'eq))
@@ -406,5 +406,5 @@ content merge independently; the content through the leaf engine's three-way."
       (values (make-diff (%canonical-sort merged) :engine e :level :changes)
               (nreverse conflicts)))))
 
-(defmethod %rebase ((e tree-diff-engine) d onto base)
-  (%rebase-by-merge e d onto base))
+(defmethod rebase-states ((e tree-diff-engine) d onto base)
+  (rebase-by-merge e d onto base))

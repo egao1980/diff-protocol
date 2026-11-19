@@ -230,11 +230,11 @@ unreachable list index calls FAIL."
 
 ;;; Apply one leaf
 
-(defmethod %apply-change ((e sexp-diff-engine) state (c opaque-change) d)
+(defmethod apply-change ((e sexp-diff-engine) state (c opaque-change) d)
   (declare (ignore state))
   (error 'unsupported-content :engine e :content c :change c :diff d))
 
-(defmethod %apply-change ((e sexp-diff-engine) state (c change) d)
+(defmethod apply-change ((e sexp-diff-engine) state (c change) d)
   (labels ((fail (reason actual)
              (error 'apply-conflict :reason reason :actual actual :change c :diff d))
            (expect-before (p)
@@ -263,7 +263,7 @@ unreachable list index calls FAIL."
          (expect-absent p)
          (put (%state-delete state (change-from c)) p (change-after c)))))))
 
-(defmethod %put-value ((e sexp-diff-engine) state (c change) value d)
+(defmethod put-value ((e sexp-diff-engine) state (c change) value d)
   (%state-put state (change-path c) value
               (lambda ()
                 (error 'apply-conflict :reason :missing :actual nil :change c :diff d))))
