@@ -209,10 +209,20 @@ context-0 diff of its sides when it has none (:SUMMARY)."
     (when hunks
       (%render-hunks e (%text-algorithm e) hunks s))))
 
+(defmethod render-unified-content ((e text-diff-engine) before after changes stream)
+  ;; Line hunks: CHANGES (this engine's hunks) when given, else a line diff of the sides.
+  (when (and (typep before '(or null string)) (typep after '(or null string)))
+    (let ((hunks (or changes (diff-changes (compute-diff e (or before "") (or after ""))))))
+      (when hunks
+        (%render-hunks e (text-engine-algorithm e) hunks stream))
+      t)))
+
 ;;; Tree diffs: sections
 
 (defstruct (%section (:constructor %make-section (key)))
-  key kind from old-node new-node old-mode new-mode file-mode hunks binary-p)
+  key kind from old-node new-node old-mode new-mode file-mode hunks binary-p
+  ;; Non-text leaf changes, and the file nodes around them when the diff has them.
+  leaf-changes leaf-before leaf-after)
 
 (defun %text-node-p (node)
   (and (tree-file-p node) (eq :text (tree-file-type node)) (stringp (tree-file-content node))))
@@ -237,7 +247,9 @@ context-0 diff of its sides when it has none (:SUMMARY)."
                        ((some (lambda (f) (and (> (length f) 5) (string= "text:" f :end2 5)))
                               (change-footprint c))
                         (setf (%section-hunks sec) (append (%section-hunks sec) (list c))))
-                       (t (setf (%section-binary-p sec) t)))))
+                       (t (setf (%section-leaf-changes sec)
+                                (append (%section-leaf-changes sec) (list c))
+                                (%section-binary-p sec) t)))))
              (walk (c)
                (cond
                  ((typep c 'opaque-change)
@@ -251,6 +263,9 @@ context-0 diff of its sides when it has none (:SUMMARY)."
                       (setf (%section-file-mode sec) (%parsed-opaque-mode c)))))
                  ((%leaf-change-p c) (leaf c))
                  ((and (eq :modify (change-kind c)) (change-children c))
+                  (let ((sec (section (change-path c))))
+                    (setf (%section-leaf-before sec) (%box-value (%before-box c))
+                          (%section-leaf-after sec) (%box-value (%after-box c))))
                   (mapc #'walk (change-children c)))
                  (t
                   (let ((sec (section (change-path c))))
@@ -267,6 +282,42 @@ context-0 diff of its sides when it has none (:SUMMARY)."
   (let ((leaf (%leaf-engine e :text)))
     (if (typep leaf 'text-diff-engine) leaf (find-diff-engine :text))))
 
+(defun %scheme-leaf-engine (e c)
+  "The leaf engine of E whose ENGINE-NAME is the scheme of leaf change C's footprint
+(\"lisp:/…\" → :LISP), or NIL."
+  (let* ((f (find-if-not (lambda (f) (%prefix-p "tree:" f)) (change-footprint c)))
+         (colon (and f (position #\: f))))
+    (when colon
+      (let ((scheme (subseq f 0 colon)))
+        (loop for (nil . spec) in (tree-engine-leaf-engines e)
+              for leaf = (if (symbolp spec) (and spec (find-diff-engine spec)) spec)
+              when (and leaf (string-equal scheme (symbol-name (engine-name leaf))))
+                return leaf)))))
+
+(defun %content-of (node)
+  (and (tree-file-p node) (tree-file-content node)))
+
+(defun %section-leaf (e sec kind on nn)
+  "→ (values leaf-engine before after changes) to render a non-text section with
+RENDER-UNIFIED-CONTENT, or NIL when no leaf engine applies."
+  (let ((changes (%section-leaf-changes sec)))
+    (cond (changes
+           (let* ((lb (%section-leaf-before sec))
+                  (la (%section-leaf-after sec))
+                  (leaf (if (tree-file-p lb)
+                            (%leaf-engine e (tree-file-type lb))
+                            (%scheme-leaf-engine e (first changes))))
+                  (n (length (%section-key sec))))
+             (values leaf (%content-of lb) (%content-of la)
+                     (mapcar (lambda (c) (%unnest c n)) changes))))
+          ((case kind
+             (:add (tree-file-p nn))
+             (:remove (tree-file-p on))
+             ((:move :modify) (and (tree-file-p on) (tree-file-p nn)
+                                   (eq (tree-file-type on) (tree-file-type nn)))))
+           (values (%leaf-engine e (tree-file-type (if (tree-file-p on) on nn)))
+                   (%content-of on) (%content-of nn) nil)))))
+
 (defun %render-section (e sec s)
   (let* ((kind (%section-kind sec))
          (new (%path-string (%section-key sec)))
@@ -277,7 +328,8 @@ context-0 diff of its sides when it has none (:SUMMARY)."
          (hunks (%section-hunks sec))
          (binary (%section-binary-p sec))
          (old-mode (%section-old-mode sec))
-         (new-mode (%section-new-mode sec)))
+         (new-mode (%section-new-mode sec))
+         (body nil))
     ;; Whole nodes (add / remove / move / modify without children): derive the rest.
     (flet ((content-hunks (a b)
              (diff-changes (compute-diff text a b))))
@@ -300,6 +352,15 @@ context-0 diff of its sides when it has none (:SUMMARY)."
                        (%content-equal e (tree-file-type on)
                                        (tree-file-content on) (tree-file-content nn))))
                  (t (setf binary t)))))))
+    ;; A non-text file: its leaf engine's unified form, when it has one (#7).
+    (when binary
+      (multiple-value-bind (leaf before after changes) (%section-leaf e sec kind on nn)
+        (when leaf
+          (let* ((ok nil)
+                 (out (with-output-to-string (o)
+                        (setf ok (render-unified-content leaf before after changes o)))))
+            (when ok
+              (setf binary nil body out))))))
     (format s "diff --git ~A ~A~%" (%git-path "a/" old) (%git-path "b/" new))
     (when (and old-mode new-mode (not (member kind '(:add :remove))))
       (format s "old mode ~O~%new mode ~O~%" old-mode new-mode))
@@ -322,7 +383,10 @@ context-0 diff of its sides when it has none (:SUMMARY)."
       (cond ((eq kind :copy))
             (binary (format s "Binary files ~A and ~A differ~%" a b))
             (hunks (format s "--- ~A~%+++ ~A~%" a b)
-                   (%render-hunks e (text-engine-algorithm text) hunks s))))))
+                   (%render-hunks e (text-engine-algorithm text) hunks s))
+            ((plusp (length body))
+             (format s "--- ~A~%+++ ~A~%" a b)
+             (write-string body s))))))
 
 (defun %render-tree-unified (e d s)
   (dolist (sec (%tree-sections d))
@@ -334,7 +398,9 @@ context-0 diff of its sides when it has none (:SUMMARY)."
                  (typecase e
                    (text-diff-engine (%render-text-unified e d s))
                    (tree-diff-engine (%render-tree-unified e d s))
-                   (t (error 'unsupported-content :engine e :content d :diff d))))))
+                   (t (unless (and (typep e 'diff-engine)
+                                   (render-unified-content e nil nil (%leaves (diff-changes d)) s))
+                        (error 'unsupported-content :engine e :content d :diff d)))))))
     (%call-with-output stream (lambda (s) (write-string text s)))))
 
 ;;; Parse

@@ -36,4 +36,10 @@
    #:tree-file-type #:tree-file-content #:tree-file-mode #:tree-get #:tree-mode
    ;; R1: tree engine
    #:tree-diff-engine #:tree-engine-rename-threshold #:tree-engine-detect-renames
-   #:tree-engine-leaf-engines))
+   #:tree-engine-leaf-engines
+   ;; 0.3: engine extension API (#6, #7). Engines in other repos subclass DIFF-ENGINE,
+   ;; register an instance and specialize these GFs.
+   #:register-diff-engine
+   #:apply-change #:put-value #:invert-change
+   #:merge-states #:rebase-states #:rebase-by-merge
+   #:render-unified-content))

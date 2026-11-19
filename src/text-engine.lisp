@@ -18,13 +18,7 @@ from MAKE-INSTANCE."))
 (defmethod engine-name ((e text-diff-engine))
   :text)
 
-(defun %register-engine (name engine)
-  "Register ENGINE under NAME once (a reload keeps the shared instance)."
-  (unless (find-diff-engine name)
-    (setf *diff-engines* (append *diff-engines* (list (cons name engine)))))
-  (find-diff-engine name))
-
-(%register-engine :text (make-instance 'text-diff-engine))
+(register-diff-engine :text (make-instance 'text-diff-engine))
 
 ;;; Lines
 
@@ -228,11 +222,11 @@ widening is the same on both sides."
 
 ;;; Apply
 
-(defmethod %apply-change ((e text-diff-engine) state (c opaque-change) d)
+(defmethod apply-change ((e text-diff-engine) state (c opaque-change) d)
   (declare (ignore state))
   (error 'unsupported-content :engine e :content c :change c :diff d))
 
-(defmethod %apply-change ((e text-diff-engine) state (c change) d)
+(defmethod apply-change ((e text-diff-engine) state (c change) d)
   (unless (stringp state)
     (error 'unsupported-content :engine e :content state :change c :diff d))
   (if (null (change-path c))
@@ -250,7 +244,7 @@ widening is the same on both sides."
             (error 'apply-conflict :reason :before-mismatch :actual found :change c :diff d))
           (%join-lines (append (subseq lines 0 p) (change-after c) (nthcdr end lines)))))))
 
-(defmethod %put-value ((e text-diff-engine) state (c change) value d)
+(defmethod put-value ((e text-diff-engine) state (c change) value d)
   (unless (stringp state)
     (error 'unsupported-content :engine e :content state :change c :diff d))
   (let ((value-string (if (stringp value) value (%join-lines value))))
@@ -310,7 +304,7 @@ interact when s1 <= e2 and s2 <= e1; regions close that relation transitively."
                           o x))))
               (nreverse groups)))))
 
-(defmethod %three-way ((e text-diff-engine) base ours theirs resolve)
+(defmethod merge-states ((e text-diff-engine) base ours theirs resolve)
   (let* ((bv (%line-vector base))
          (merged '())
          (conflicts '()))
@@ -329,8 +323,8 @@ interact when s1 <= e2 and s2 <= e1; regions close that relation transitively."
     (values (make-diff merged :engine e :level :changes)
             (nreverse conflicts))))
 
-(defmethod %rebase ((e text-diff-engine) d onto base)
-  (%rebase-by-merge e d onto base))
+(defmethod rebase-states ((e text-diff-engine) d onto base)
+  (rebase-by-merge e d onto base))
 
 (defun merge-texts (base ours theirs &key engine (style :merge)
                                           (ours-label "ours") (base-label "base")

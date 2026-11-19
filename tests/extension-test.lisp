@@ -158,3 +158,26 @@
   (ok (eq #'d:rebase-states (fdefinition 'diff-protocol::%rebase)))
   (ok (eq #'d:invert-change (fdefinition 'diff-protocol::%invert-change)))
   (ok (eq *note* (diff-protocol::%register-engine :note (make-instance 'note-engine)))))
+
+;;; An engine written against 0.2 (methods on the % names, as diff-backend-lisp-source
+;;; does) keeps working: the % names are the same generic functions.
+
+(defclass legacy-note-engine (note-engine) ())
+
+(defmethod d:engine-name ((e legacy-note-engine))
+  :legacy-note)
+
+(defmethod diff-protocol::%apply-change ((e legacy-note-engine) state (c d:change) diff)
+  (string-upcase (call-next-method)))
+
+(defmethod diff-protocol::%three-way ((e legacy-note-engine) base ours theirs resolve)
+  (multiple-value-bind (merged conflicts) (call-next-method)
+    (values merged (cons :legacy conflicts))))
+
+(deftest extension-old-name-methods
+  (let* ((e (diff-protocol::%register-engine :legacy-note (make-instance 'legacy-note-engine)))
+         (diff (d:compute-diff e (nl "a") (nl "b"))))
+    (ok (eq e (d:find-diff-engine :legacy-note)))
+    (ok (equal (nl "B") (d:apply-diff (nl "a") diff)) "a %APPLY-CHANGE method runs under APPLY-DIFF")
+    (ok (eq :legacy (first (nth-value 1 (d:three-way-diff e (nl "a") (nl "b") (nl "b")))))
+        "a %THREE-WAY method runs under THREE-WAY-DIFF")))
