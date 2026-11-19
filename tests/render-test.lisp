@@ -6,7 +6,7 @@
   "Read exactly one form from STRING without #. evaluation."
   (let ((*read-eval* nil))
     (multiple-value-bind (form end) (read-from-string string)
-      (assert (null (read-from-string string nil :eof :start end)) ()
+      (assert (eq :eof (read-from-string string nil :eof :start end)) ()
               "More than one form in ~S" string)
       form)))
 

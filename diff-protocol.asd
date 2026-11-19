@@ -8,7 +8,10 @@
   :pathname "src"
   :components ((:file "package")
                (:file "conditions")
-               (:file "protocol"))
+               (:file "protocol")
+               (:file "sexp-engine")
+               (:file "ops")
+               (:file "render"))
   :in-order-to ((test-op (test-op "diff-protocol/tests"))))
 
 (defsystem "diff-protocol/tests"
