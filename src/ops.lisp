@@ -122,11 +122,18 @@ other string is kept."
   (some (lambda (f) (some (lambda (g) (footprint-overlap-p f g)) (change-footprint y)))
         (change-footprint x)))
 
-(defun %conflict (ours theirs)
+(defun make-conflict (ours theirs)
+  "A DIFF-CONFLICT between the changes OURS and THEIRS (CHANGE values), its
+footprint the sorted union of both footprints. For engines outside diff-protocol whose
+MERGE-STATES or REBASE-STATES report conflicts. %CONFLICT (0.3.0 internal)
+names the same function."
   (make-instance 'diff-conflict
                  :ours ours :theirs theirs
                  :footprint (%sorted-footprint (list (change-footprint ours)
                                                      (change-footprint theirs)))))
+
+(declaim (ftype function %conflict))
+(setf (fdefinition (quote %conflict)) (function make-conflict))
 
 (defun %partition (e xs ys &key (conflict-p (constantly t)))
   "Pair change lists XS (ours) and YS (theirs). → (values x-status y-status conflicts twins).

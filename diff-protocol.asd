@@ -1,5 +1,5 @@
 (defsystem "diff-protocol"
-  :version "0.3.0"
+  :version "0.4.0"
   :description "CLOS diff protocol for cl-stack: diffs as values (change trees), engines per content type, apply / invert / compose / rebase / three-way"
   :author "egao1980"
   :license "MIT"

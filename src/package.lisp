@@ -20,7 +20,7 @@
    #:diff-footprint #:diff-empty-p
    #:footprint-overlap-p
    ;; conflicts (data)
-   #:diff-conflict #:conflict-ours #:conflict-theirs #:conflict-footprint
+   #:diff-conflict #:make-conflict #:conflict-ours #:conflict-theirs #:conflict-footprint
    ;; engines
    ;; diff-engine (exported above) is also the engine base class
    #:sexp-diff-engine #:engine-name #:find-diff-engine

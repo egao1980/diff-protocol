@@ -181,3 +181,14 @@
     (ok (equal (nl "B") (d:apply-diff (nl "a") diff)) "a %APPLY-CHANGE method runs under APPLY-DIFF")
     (ok (eq :legacy (first (nth-value 1 (d:three-way-diff e (nl "a") (nl "b") (nl "b")))))
         "a %THREE-WAY method runs under THREE-WAY-DIFF")))
+
+(deftest extension-make-conflict
+  (let* ((ours (first (d:diff-changes (d:compute-diff *note* (nl "a") (nl "b")))))
+         (theirs (first (d:diff-changes (d:compute-diff *note* (nl "a") (nl "c")))))
+         (c (d:make-conflict ours theirs)))
+    (ok (typep c 'd:diff-conflict))
+    (ok (eq ours (d:conflict-ours c)))
+    (ok (eq theirs (d:conflict-theirs c)))
+    (ok (equal '("note:/") (d:conflict-footprint c)) "footprints merged, sorted, once")
+    (ok (eq (fdefinition 'd:make-conflict) (fdefinition 'diff-protocol::%conflict))
+        "%CONFLICT is the same function")))
